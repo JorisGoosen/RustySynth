@@ -23,27 +23,27 @@ fn main() {
     }
 }
 
+fn geluid  (index: i64, freq: f64) -> f32
+{
+    ((index as f64 / TABLE_SIZE as f64 * PI * 2.0 * freq).sin() * 0.2) as f32
+}
+
 fn run() -> Result<(), pa::Error> {
     println!(
         "PortAudio Test: output sine wave. SR = {}, BufSize = {}",
         SAMPLE_RATE, FRAMES_PER_BUFFER
     );
 
-    // Initialise sinusoidal wavetable.
-    let mut sine = [0.0; TABLE_SIZE];
-    for i in 0..TABLE_SIZE {
-        sine[i] = (i as f64 / TABLE_SIZE as f64 * PI * 2.0).sin() as f32;
-    }
-    let mut left_phase = 0;
-    let mut right_phase = 0;
-    let mut right_shift = 4;
 
     let pa = pa::PortAudio::new()?;
 
     let mut settings =
         pa.default_output_stream_settings(CHANNELS, SAMPLE_RATE, FRAMES_PER_BUFFER)?;
     // we won't output out of range samples so don't bother clipping them.
-   // settings.flags = pa::stream_flags::CLIP_OFF;
+    //settings.flags = pa::stream_flags::CLIP_OFF;
+
+    let mut idxCum: i64 = 0;
+    let mut freq:   f64 = 0.1;
 
     // This routine will be called by the PortAudio engine when audio is needed. It may called at
     // interrupt level on some machines so don't do anything that could mess up the system like
@@ -51,18 +51,15 @@ fn run() -> Result<(), pa::Error> {
     let callback = move |pa::OutputStreamCallbackArgs { buffer, frames, .. }| {
         let mut idx = 0;
         for _ in 0..frames {
-            buffer[idx] = sine[left_phase];
-            buffer[idx + 1] = sine[right_phase];
-            left_phase += 1;
-            if left_phase >= TABLE_SIZE {
-                left_phase -= TABLE_SIZE;
-            }
-            right_phase += right_shift;
-            if right_phase >= TABLE_SIZE {
-                right_phase -= TABLE_SIZE;
-            }
+            let geluidsmonster: f32 = geluid(idx as i64 + idxCum, freq);
+            buffer[idx    ] = geluidsmonster;
+            buffer[idx + 1] = geluidsmonster;
+            
             idx += 2;
         }
+
+        idxCum += idx as i64;
+        freq *= 1.002;
         
        /* right_shift += 1;
         if right_shift > TABLE_SIZE / 20 
